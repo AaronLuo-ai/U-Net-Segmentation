@@ -1,0 +1,24 @@
+# Ignore system files
+.DS_Store
+
+# Ignore IDE project files (e.g., for JetBrains IDEs like PyCharm)
+.idea/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore virtual environments
+env/
+venv/
+
+# Ignore Wandb logs and outputs
+wandb/
+
+# Ignore large dataset directories
+first_20_3D_resampled/
+
+# Ignore CSV and log files
+*.csv
+*.log
+
