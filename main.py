@@ -3,7 +3,8 @@ from utils import loss
 from utils.train_loader import TrainDataset
 from utils.test_loader import TestDataset
 from torch.utils.data import DataLoader
-from utils.loss import DiceLoss
+from utils.loss import CustomCrossEntropyLoss
+import torch.nn as nn
 import wandb
 import torch.optim as optim
 import torch
@@ -15,9 +16,9 @@ def main():
     test_data = TestDataset()
     train_loader = DataLoader(train_data, batch_size = 4, shuffle = True)
     test_loader = DataLoader(test_data, batch_size = 3, shuffle = True)
-    loss_func = DiceLoss()
     num_epoch = 3
     model = UNet()
+    loss_func = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.999))
     train_loss = []
     test_loss = []
@@ -48,7 +49,7 @@ def main():
             #     plt.tight_layout()  # Adjust layout to avoid overlap
             #     plt.title(f'Image {i + 1}')
             #     plt.show()
-            #
+
             # for i in range(labels.shape[0]):
             #     plt.figure(figsize=(10, 6))  # Create a figure with a grid of subplots
             #     plt.imshow(labels[i].squeeze(), cmap='gray')
@@ -57,6 +58,15 @@ def main():
             #     plt.show()
 
             outputs = model(inputs) # accepts (N, channel, width, length)
+            outputs = (outputs - outputs.min()) / (outputs.max() - outputs.min())
+            #for i in range(outputs.shape[0]):
+                #plt.figure(figsize=(10, 6))  # Create a figure with a grid of subplots
+                #plt.imshow(outputs[i].detach().numpy().squeeze(), cmap='gray')
+                #plt.tight_layout()  # Adjust layout to avoid overlap
+                #plt.title(f'outputs {i + 1}')
+                #plt.show()
+            print("max of outputs, min of outputs: ", outputs.max(), outputs.min())
+            print("max of labels, min of labels: ",labels.max(), labels.min())
             loss = loss_func(outputs, labels)
             loss.requires_grad_(True)
             print("Loss: ", loss)
