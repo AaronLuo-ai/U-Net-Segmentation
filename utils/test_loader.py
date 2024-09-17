@@ -21,10 +21,13 @@ class TestDataset(Dataset):
         self.target_size = (512, 512)
         self.mask_list = []
         self.image_list = []
+        self.seg_list = []
         num_files = len(self.test_image_files)
         for index in range(num_files):
             test_nrrd_array , _ = nrrd.read(self.root_dir /  Path(self.test_image_files[index]))
+            print(self.root_dir /  Path(self.test_image_files[index]))
             mask_nrrd_array, _ = nrrd.read(self.root_dir /  Path(self.test_mask_files[index]))
+            print(self.root_dir /  Path(self.test_mask_files[index]))
             image_padded = self.pad_image_top_left(test_nrrd_array, self.target_size)
             mask_padded = self.pad_image_top_left(mask_nrrd_array, self.target_size)
 
@@ -33,6 +36,11 @@ class TestDataset(Dataset):
                 mask_slice = mask_padded[i, :, :]
                 print("image_slice.shape: ", image_slice.shape)
                 print("mask_slice.shape: ", mask_slice.shape)
+                seg_image = image_slice * mask_slice
+                seg_image = (seg_image - seg_image.min()) / (seg_image.max() - seg_image.min())
+                mask_slice = (mask_slice - mask_slice.min()) / (mask_slice.max() - mask_slice.min())
+                image_slice = (image_slice - image_slice.min()) / (image_slice.max() - image_slice.min())
+                self.seg_list.append(seg_image)
                 self.mask_list.append(mask_slice)
                 self.image_list.append(image_slice)
 
@@ -53,11 +61,12 @@ class TestDataset(Dataset):
 
         image = self.image_list[index]
         mask = self.mask_list[index]
+        seg = self.seg_list[index]
         # print("image.shape in dataloader: ", image.shape)
         # print("mask.shape in dataloader: ", mask.shape)
         # print("image.shape in dataloader: ", image.shape)
         # print("mask.shape in dataloader: ", mask.shape)
-        return np.expand_dims(image, axis=0), np.expand_dims(mask, axis=0)
+        return np.expand_dims(image, axis=0), np.expand_dims(seg, axis=0)
 
 
     def __len__(self):
