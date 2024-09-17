@@ -1,3 +1,5 @@
+from cProfile import label
+
 from models.network_unet import UNet
 from utils import loss
 from utils.train_loader import TrainDataset
@@ -9,15 +11,20 @@ import torch.optim as optim
 import torch
 import matplotlib.pyplot as plt
 import io
+from PIL import Image
 
 def main():
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+    print("torch.cuda.is_available(): ", torch.cuda.is_available())
+    # print("torch.cuda.is_available(): ".format(torch.cuda.is_available()==False))
     train_data = TrainDataset()
     test_data = TestDataset()
     train_loader = DataLoader(train_data, batch_size = 4, shuffle = True)
     test_loader = DataLoader(test_data, batch_size = 3, shuffle = True)
     loss_func = DiceLoss()
-    num_epoch = 3
-    model = UNet()
+    num_epoch = 200
+    model = UNet().to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.999))
     train_loss = []
     test_loss = []
@@ -34,27 +41,32 @@ def main():
         for i, train_batch in enumerate(train_loader):
             # calculate outputs
             inputs, labels = train_batch
-            inputs = inputs.float()
-            labels = labels.float()
+            inputs = inputs.float().to(device)
+            labels = labels.float().to(device)
+
             # print("inputs.shape: ", inputs.shape)
             # print("labels.shape: ", labels.shape)
             # print("inputs.dtype: ", inputs.dtype)
             # print("labels.dtype: ", labels.dtype)
+            outputs = model(inputs) # accepts (N, channel, width, length)
 
-
-            # for i in range(inputs.shape[0]):
-            #     plt.figure(figsize=(10, 6))  # Create a figure with a grid of subplots
-            #     plt.imshow(inputs[i].squeeze(), cmap='gray')
-            #     plt.tight_layout()  # Adjust layout to avoid overlap
-            #     plt.title(f'Image {i + 1}')
-            #     plt.show()
-            #
-            # for i in range(labels.shape[0]):
-            #     plt.figure(figsize=(10, 6))  # Create a figure with a grid of subplots
-            #     plt.imshow(labels[i].squeeze(), cmap='gray')
-            #     plt.tight_layout()  # Adjust layout to avoid overlap
-            #     plt.title(f'Mask {i + 1}')
-            #     plt.show()
+            if epoch in [100,200,299]:
+                for i in range(inputs.shape[0]):
+                    plt.figure(figsize=(10, 6))  # Create a figure with a grid of subplots
+                    plt.imshow(inputs[i].cpu().squeeze(), cmap='gray')
+                    plt.tight_layout()  # Adjust layout to avoid overlap
+                    plt.title(f'Image {i + 1}')
+                    plt.show()
+                    plt.figure(figsize=(10, 6))  # Create a figure with a grid of subplots
+                    plt.imshow(labels[i].cpu().squeeze(), cmap='gray')
+                    plt.tight_layout()  # Adjust layout to avoid overlap
+                    plt.title(f'labels {i + 1}')
+                    plt.show()
+                    plt.figure(figsize=(10, 6))  # Create a figure with a grid of subplots
+                    plt.imshow(outputs[i].detach().cpu().squeeze(), cmap='gray')
+                    plt.tight_layout()  # Adjust layout to avoid overlap
+                    plt.title(f'outputs {i + 1}')
+                    plt.show()
 
             outputs = model(inputs) # accepts (N, channel, width, length)
             loss = loss_func(outputs, labels)
@@ -80,8 +92,8 @@ def main():
         with torch.no_grad():
             for j, test_batch in enumerate(test_loader):
                 inputs, labels = test_batch
-                inputs = inputs.float()
-                labels = labels.float()
+                inputs = inputs.float().to(device)
+                labels = labels.float().to(device)
                 outputs = model(inputs)
                 loss = loss_func(outputs, labels)
                 epoch_val_loss += loss.item()
@@ -92,7 +104,6 @@ def main():
         print("avg_val_loss: ",avg_val_loss)
         wandb.log({"epoch": epoch + 1, "val_loss": avg_val_loss})
 
-    # Now plot the graph after the loop
     plt.plot(range(1, num_epoch + 1), train_loss, label='Training Loss')
     plt.plot(range(1, num_epoch + 1), test_loss, label='Test Loss')
     plt.xlabel('Epochs')
@@ -100,16 +111,21 @@ def main():
     plt.title('Training and Validation Loss over Epochs')
     plt.legend()
 
+    # Save plot to a BytesIO buffer
     buf = io.BytesIO()
     plt.savefig(buf, format='png')
     buf.seek(0)
 
-    wandb.log({"loss_curve": wandb.Image(buf)})
+    # Convert BytesIO buffer to PIL Image
+    image = Image.open(buf)
 
-    # Show the plot (optional, for local visualization)
+    # Log image to wandb
+    wandb.log({"loss_curve": wandb.Image(image)})
+
+    # Show the plot (optional for local visualization)
     plt.show()
 
-    # Close the buffer and the plot
+    # Close the buffer
     buf.close()
 
 
