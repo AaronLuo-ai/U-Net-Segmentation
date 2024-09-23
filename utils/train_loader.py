@@ -7,7 +7,7 @@ import nrrd
 import pandas as pd
 from torch.utils.data import DataLoader
 
-batch_path = Path(r"C:\Users\aaron.l\Documents\U-Net-Segmentation\Data\batch.csv")
+batch_path = Path("C:\\Users\\aaron.l\\Documents\\U-Net-Segmentation\\Data\\batch.csv")
 df = pd.read_csv(batch_path)
 total_rows = len(df)
 separation_index = (3 * total_rows) // 4
@@ -16,12 +16,14 @@ train_df = df.iloc[:separation_index]
 
 class TrainDataset(Dataset):
     def __init__(self):
-        self.root_dir = Path(r"C:\Users\aaron.l\Documents\U-Net-Segmentation\Data")
+        self.root_dir = ("C:\\Users\\aaron.l\\Documents\\U-Net-Segmentation\\Data")
         self.train_image_files = train_df['Image'].tolist()
         self.train_mask_files = train_df['Mask'].tolist()
         self.mask_list = []
         self.image_list = []
         self.target_size = (512, 512)
+        self.seg_list = []
+
         num_files = len(self.train_image_files)
         for index in range(num_files):
             train_nrrd_array , _ = nrrd.read(self.root_dir /  Path(self.train_image_files[index]))
@@ -29,9 +31,17 @@ class TrainDataset(Dataset):
             image_padded = self.pad_image_top_left(train_nrrd_array, self.target_size)
             mask_padded = self.pad_image_top_left(mask_nrrd_array, self.target_size)
 
+
             for i in range(image_padded.shape[0]):
                 image_slice = image_padded[i, :, :]
                 mask_slice = mask_padded[i, :, :]
+                # print("image_slice.shape: ", image_slice.shape)
+                # print("mask_slice.shape: ", mask_slice.shape)
+                seg_image = image_slice * mask_slice
+                seg_image = (seg_image - seg_image.min()) / (seg_image.max() - seg_image.min())
+                mask_slice = (mask_slice - mask_slice.min()) / (mask_slice.max() - mask_slice.min())
+                image_slice = (image_slice - image_slice.min()) / (image_slice.max() - image_slice.min())
+                self.seg_list.append(seg_image)
                 self.mask_list.append(mask_slice)
                 self.image_list.append(image_slice)
 
@@ -51,11 +61,12 @@ class TrainDataset(Dataset):
         # print("type of mask_nrrd_array: ", type(mask_nrrd_array))
         image = self.image_list[index]
         mask = self.mask_list[index]
+        seg = self.seg_list[index]
         # print("image.shape in dataloader: ", image.shape)
         # print("mask.shape in dataloader: ", mask.shape)
         # print("image type in dataloader: ", type(image))
         # print("mask type in dataloader: ", type(mask))
-        return np.expand_dims(image, axis=0), np.expand_dims(mask, axis=0)
+        return np.expand_dims(image, axis=0), np.expand_dims(seg, axis=0)
 
 
     def __len__(self):
